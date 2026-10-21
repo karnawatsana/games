@@ -5,10 +5,13 @@ import { parseKrillionShare } from "@/lib/krillion/shareText";
 import { parseFermiShare } from "@/lib/fermi/parse";
 import { hasBlockingIssues, validateExtraction, type Issue } from "@/lib/krillion/validate";
 import type { KrillionExtraction } from "@/lib/krillion/schema";
+import { checkFermi, type FermiExtraction } from "@/lib/fermi/schema";
+import { fermiDateForNumber } from "@/lib/fermi/parse";
 
 type GameKey = "krillion" | "fermi" | "mystery";
 type Props = { today: string; username: string; mysteryName: string | null; initialGame?: GameKey };
 
+const prettyShort = (d: string) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(`${d}T12:00:00Z`));
 const label: Record<GameKey, string> = { krillion: "Krillion", fermi: "Fermi", mystery: "Mystery" };
 const statusCopy = { created: "Saved. Nice one.", enriched: "Added to your existing result.", corrected: "Result updated.", unchanged: "Already saved. Nothing changed." } as const;
 
@@ -26,6 +29,7 @@ export default function SubmitFlow({ today, username, mysteryName, initialGame =
   const [preview, setPreview] = useState<string | null>(null);
   const [extraction, setExtraction] = useState<KrillionExtraction | null>(null);
   const [path, setPath] = useState<string | undefined>();
+  const [fermiX, setFermiX] = useState<FermiExtraction | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +37,12 @@ export default function SubmitFlow({ today, username, mysteryName, initialGame =
   const kShare = useMemo(() => (game === "krillion" && text ? parseKrillionShare(text) : null), [game, text]);
   const fShare = useMemo(() => (game === "fermi" && text ? parseFermiShare(text) : null), [game, text]);
 
-  const reset = () => { setExtraction(null); setPreview(null); setPath(undefined); setText(""); setManualScore(""); };
+  const onText = (v: string) => {
+    setText(v);
+    const p = parseFermiShare(v);
+    if (game === "fermi" && p.puzzleNumber) { const d = fermiDateForNumber(p.puzzleNumber); if (d <= today) { setDate(d); setDateConfirmed(true); } }
+  };
+  const reset = () => { setFermiX(null); setExtraction(null); setPreview(null); setPath(undefined); setText(""); setManualScore(""); };
   const done = (r: SaveResult) => { if (r.ok) { setMsg({ kind: "ok", text: statusCopy[r.status] }); reset(); } else setMsg({ kind: "err", text: r.error }); };
 
   async function onFile(f: File | undefined) {
@@ -41,11 +50,18 @@ export default function SubmitFlow({ today, username, mysteryName, initialGame =
     setMsg(null); setExtraction(null); setPreview(URL.createObjectURL(f)); setBusy(true);
     const fd = new FormData(); fd.set("image", f);
     try {
-      const res = await fetch("/api/extract/krillion", { method: "POST", body: fd });
+      const res = await fetch(`/api/extract/${game === "fermi" ? "fermi" : "krillion"}`, { method: "POST", body: fd });
       const j = await res.json();
       if (!res.ok) { setMsg({ kind: "err", text: j.error ?? "Couldn't read that screenshot." }); return; }
-      setExtraction(j.extraction); setPath(j.storagePath ?? undefined);
-      setDateConfirmed(!!j.extraction.gameDate); if (j.extraction.gameDate) setDate(j.extraction.gameDate);
+      setPath(j.storagePath ?? undefined);
+      if (game === "fermi") {
+        const x = j.extraction as FermiExtraction; setFermiX(x);
+        const d = x.gameDate ?? (x.puzzleNumber ? fermiDateForNumber(x.puzzleNumber) : null);
+        setDateConfirmed(!!x.gameDate); if (d && d <= today) setDate(d);
+      } else {
+        setExtraction(j.extraction);
+        setDateConfirmed(!!j.extraction.gameDate); if (j.extraction.gameDate) setDate(j.extraction.gameDate);
+      }
     } catch { setMsg({ kind: "err", text: "Upload failed. Check your connection and try again." }); }
     finally { setBusy(false); }
   }
@@ -62,15 +78,18 @@ export default function SubmitFlow({ today, username, mysteryName, initialGame =
       const score = manualScore ? Number(manualScore) : kShare?.totalScore ?? undefined;
       return done(await saveResult({ game, gameDate: date, method: text ? "share_text" : "manual", rawText: text || undefined, score }));
     }
+    if (game === "fermi" && mode === "screenshot" && fermiX) {
+      return done(await saveResult({ game, gameDate: date, method: "screenshot", fermiExtraction: fermiX, screenshotPath: path }));
+    }
     if (game === "fermi") {
-      const display = manualScore || fShare?.overall || undefined;
-      return done(await saveResult({ game, gameDate: date, method: text && !manualScore ? "share_text" : "manual", rawText: text || undefined, scoreDisplay: display, score: display ? Number.parseFloat(display) : undefined }));
+      const typed = manualScore ? Number.parseFloat(manualScore) : fShare?.overall?.value;
+      return done(await saveResult({ game, gameDate: date, method: text && !manualScore ? "share_text" : "manual", rawText: text || undefined, score: typed }));
     }
     return done(await saveResult({ game, gameDate: date, method: text ? "share_text" : "manual", rawText: text || undefined, score: manualScore ? Number(manualScore) : undefined }));
   });
 
   const sev = (n: number) => issues.find((i) => i.questionNumber === n)?.severity;
-  const blocked = mode === "screenshot" && extraction ? hasBlockingIssues(issues) || !dateConfirmed : false;
+  const blocked = mode === "screenshot" && game === "krillion" && extraction ? hasBlockingIssues(issues) || !dateConfirmed : mode === "screenshot" && game === "fermi" && fermiX ? fermiX.score == null || !dateConfirmed : false;
 
   return (
     <div className="grid gap-3">
@@ -89,34 +108,51 @@ export default function SubmitFlow({ today, username, mysteryName, initialGame =
         <label className="field"><span>Which day’s game?</span>
           <input type="date" value={date} max={today} onChange={(e) => { setDate(e.target.value); setDateConfirmed(true); }} /></label>
 
-        {game === "krillion" && (
+        {(game === "krillion" || game === "fermi") && (
           <div className="chips" style={{ margin: 0, padding: 0 }}>
-            <button className={`chip ${mode === "text" ? "active" : ""}`} onClick={() => setMode("text")}>Quick score</button>
-            <button className={`chip ${mode === "screenshot" ? "active" : ""}`} onClick={() => setMode("screenshot")}>Full answers</button>
+            <button className={`chip ${mode === "text" ? "active" : ""}`} onClick={() => setMode("text")}>{game === "krillion" ? "Quick score" : "Paste text"}</button>
+            <button className={`chip ${mode === "screenshot" ? "active" : ""}`} onClick={() => setMode("screenshot")}>{game === "krillion" ? "Full answers" : "Share card"}</button>
           </div>
         )}
 
         {mode === "text" && (<>
           <label className="field"><span>Paste the shared result</span>
-            <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste your result text here" /></label>
+            <textarea value={text} onChange={(e) => onText(e.target.value)} placeholder="Paste your result text here" /></label>
           {game === "krillion" && text && (
             <p className="tag" style={{ height: "auto", padding: "8px 12px", borderRadius: 14 }}>
               {kShare?.totalScore != null ? `Read a score of ${kShare.totalScore} / 700. Check it below.` : "Couldn’t find a score in that text. Enter it below."}
             </p>)}
-          {game === "fermi" && text && (
-            <p className="tag" style={{ height: "auto", padding: "8px 12px", borderRadius: 14 }}>
-              {fShare?.overall ? `Found ${fShare.overall}×. Lower is better. Please confirm.` : "We don’t read Fermi share text automatically yet. Enter your multiplier below."}
-            </p>)}
+          {game === "fermi" && fShare && (
+            <div className="tag" style={{ height: "auto", padding: "10px 14px", borderRadius: 16, display: "grid", gap: 4 }}>
+              {fShare.recognized ? (<>
+                <b>Fermi No. {fShare.puzzleNumber} · {fShare.overall?.display}{fShare.topPercent != null ? ` · top ${fShare.topPercent}%` : ""}</b>
+                <span>{fShare.questions.map((q) => q.display).join("  ·  ")}</span>
+                <span style={{ opacity: .7 }}>Lower is better. Date set to {prettyShort(date)}; change it above if that’s wrong.</span>
+                {fShare.warnings.map((w) => <span key={w} role="alert" style={{ color: "#7a1d14" }}>{w}</span>)}
+              </>) : <span>That doesn’t look like a Fermi share. Enter your multiplier below, or use “Share card”.</span>}
+            </div>)}
           <label className="field"><span>{game === "krillion" ? "Total score (0–700)" : game === "fermi" ? "Error multiplier (lower is better)" : "Score (optional)"}</span>
-            <input inputMode="decimal" value={manualScore || (game === "krillion" && kShare?.totalScore != null ? String(kShare.totalScore) : game === "fermi" && fShare?.overall ? fShare.overall : "")} onChange={(e) => setManualScore(e.target.value)} />
+            <input inputMode="decimal" value={manualScore || (game === "krillion" && kShare?.totalScore != null ? String(kShare.totalScore) : game === "fermi" && fShare?.recognized && fShare.overall ? String(fShare.overall.value) : "")} onChange={(e) => setManualScore(e.target.value)} />
           </label>
           {game === "mystery" && <p className="muted" style={{ color: "var(--charcoal)", opacity: .7 }}>Without parsed proof this counts as marked complete, not a verified score.</p>}
         </>)}
 
-        {mode === "screenshot" && game === "krillion" && (<>
+        {mode === "screenshot" && (game === "krillion" || game === "fermi") && (<>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onFile(e.target.files?.[0])} />
-          <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "Reading your screenshot…" : preview ? "Choose a different screenshot" : "Upload results screenshot"}</button>
+          <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? "Reading your screenshot…" : preview ? "Choose a different screenshot" : game === "fermi" ? "Upload share card" : "Upload results screenshot"}</button>
           {preview && /* eslint-disable-next-line @next/next/no-img-element */ <img src={preview} alt="Your uploaded screenshot" style={{ maxHeight: 220, borderRadius: 18, objectFit: "cover", objectPosition: "top" }} />}
+          {fermiX && (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div className="flex items-baseline justify-between"><span className="label">Fermi{fermiX.puzzleNumber ? ` No. ${fermiX.puzzleNumber}` : ""}{fermiX.topPercent != null ? ` · top ${fermiX.topPercent}%` : ""}</span>
+                <input aria-label="Score" className="serif" style={{ fontSize: 44, width: 150, textAlign: "right", background: "transparent", border: 0 }} inputMode="decimal"
+                  value={fermiX.score ?? ""} onChange={(e) => setFermiX({ ...fermiX, score: e.target.value === "" ? null : Number(e.target.value) })} /></div>
+              {fermiX.questions.map((q) => (
+                <div key={q.questionNumber} style={{ background: "rgb(255 255 255 / .55)", borderRadius: 18, padding: 12 }}>
+                  <div className="flex gap-3 items-baseline"><span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{q.questionNumber}. {q.questionText ?? "Question"}</span><b>{q.lessThan ? "< " : ""}{q.multiplier}×</b></div>
+                </div>))}
+              {checkFermi(fermiX).map((w) => <p key={w} role="status" style={{ fontSize: 13, fontWeight: 700, color: "#6b4a00" }}>Check: {w}</p>)}
+              {!fermiX.gameDate && !dateConfirmed && <label className="flex items-center gap-2" style={{ fontWeight: 600, fontSize: 14 }}><input type="checkbox" onChange={(e) => setDateConfirmed(e.target.checked)} /> Yes, this was the game for {date}</label>}
+            </div>)}
           {extraction && (
             <div style={{ display: "grid", gap: 10 }}>
               <div className="flex items-baseline justify-between"><span className="label">Total</span>
@@ -138,7 +174,7 @@ export default function SubmitFlow({ today, username, mysteryName, initialGame =
         </>)}
 
         {msg && <p role={msg.kind === "err" ? "alert" : "status"} style={{ fontWeight: 700, fontSize: 14 }}>{msg.text}</p>}
-        <button className="btn" onClick={submit} disabled={pending || blocked || (mode === "screenshot" && !extraction)} style={{ height: 52 }}>{pending ? "Saving…" : "Confirm and save"}</button>
+        <button className="btn" onClick={submit} disabled={pending || blocked || (mode === "screenshot" && !(game === "fermi" ? fermiX : extraction))} style={{ height: 52 }}>{pending ? "Saving…" : "Confirm and save"}</button>
       </section>
     </div>
   );

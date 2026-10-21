@@ -8,6 +8,7 @@ import { ExtractionSchema, KRILLION_MAX_TOTAL } from "@/lib/krillion/schema";
 import { hasBlockingIssues, validateExtraction } from "@/lib/krillion/validate";
 import { parseKrillionShare } from "@/lib/krillion/shareText";
 import { parseFermiShare } from "@/lib/fermi/parse";
+import { checkFermi, FermiExtractionSchema } from "@/lib/fermi/schema";
 import { mergeResult, type Verification } from "@/lib/results/merge";
 
 const Input = z.object({
@@ -18,6 +19,7 @@ const Input = z.object({
   score: z.number().min(0).optional(),            // krillion total / fermi numeric multiplier / mystery native score
   scoreDisplay: z.string().max(40).optional(),    // exact representation to keep, e.g. "2.4x"
   extraction: ExtractionSchema.optional(),
+  fermiExtraction: FermiExtractionSchema.optional(),
   screenshotPath: z.string().max(200).optional(),
 });
 export type SaveInput = z.infer<typeof Input>;
@@ -70,13 +72,27 @@ export async function saveResult(raw: SaveInput): Promise<SaveResult> {
       if (i.method === "manual") verification = "user_confirmed";
     }
   } else if (i.game === "fermi") {
-    const p = i.rawText ? parseFermiShare(i.rawText) : null;
-    const display = i.scoreDisplay ?? p?.overall ?? undefined;
-    const n = i.score ?? (display ? Number.parseFloat(display) : NaN);
-    if (!Number.isFinite(n) || n < 1) return { ok: false, error: "Enter your error multiplier (1 or higher). Lower is better." };
-    score_numeric = n;
-    score_data = { multiplier: n, display: display ?? `${n}x`, direction: "lower_is_better", raw: i.rawText ?? null };
-    verification = i.method === "manual" ? "user_confirmed" : "unverified"; // parser format not yet verified against a real share
+    if (i.method === "screenshot") {
+      const x = i.fermiExtraction;
+      if (!x || x.score == null) return { ok: false, error: "We couldn't read a score from that card. Enter it by hand." };
+      score_numeric = x.score;
+      score_data = { multiplier: x.score, display: `${x.score}×`, topPercent: x.topPercent, puzzleNumber: x.puzzleNumber, questions: x.questions, direction: "lower_is_better" };
+      verification = checkFermi(x).length === 0 ? "verified" : "user_confirmed";
+    } else {
+      const p = i.rawText ? parseFermiShare(i.rawText) : null;
+      const typed = i.score ?? (i.scoreDisplay ? Number.parseFloat(i.scoreDisplay) : undefined);
+      if (p?.recognized && p.overall && (typed == null || typed === p.overall.value)) {
+        // The pasted text itself yields this score: record everything the share contains.
+        score_numeric = p.overall.value;
+        score_data = { multiplier: p.overall.value, display: p.overall.display, topPercent: p.topPercent, puzzleNumber: p.puzzleNumber, questions: p.questions, direction: "lower_is_better" };
+        verification = p.warnings.length === 0 && i.method === "share_text" ? "verified" : "user_confirmed";
+      } else {
+        if (typed == null || !Number.isFinite(typed) || typed < 1) return { ok: false, error: "Enter your error multiplier (1 or higher). Lower is better." };
+        score_numeric = typed;
+        score_data = { multiplier: typed, display: `${typed}×`, direction: "lower_is_better" };
+        verification = "user_confirmed";
+      }
+    }
   } else {
     score_numeric = i.score ?? null;
     score_data = { display: i.scoreDisplay ?? null, raw: i.rawText ?? null };
