@@ -5,7 +5,7 @@ import { KRILLION_FIXTURE as _ } from "@/tests/fixtures/krillion-expected";
 
 // DEV-ONLY visual fixture (placeholder people, not real data).
 export default async function P({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_PREVIEW !== "1") notFound();
   const { view } = await searchParams;
   const people = [{ id: "a", name: "Sana" }, { id: "b", name: "Maya" }, { id: "c", name: "Theo" }];
   const q = (n: number, t: string) => t;

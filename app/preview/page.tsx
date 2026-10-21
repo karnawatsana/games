@@ -5,7 +5,7 @@ import type { DailyState } from "@/lib/types";
 
 // DEV-ONLY visual fixture for design review. Placeholder people and a placeholder game; not real data.
 export default async function Preview({ searchParams }: { searchParams: Promise<{ done?: string }> }) {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_PREVIEW !== "1") notFound();
   const { done = "1" } = await searchParams;
   const n = Number(done);
   const state: DailyState = {
