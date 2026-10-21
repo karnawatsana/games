@@ -74,3 +74,5 @@ Tokens live in `app/globals.css` (`@theme` + CSS variables): charcoal `#202120`,
 - **Verification levels:** `verified` (parsed/validated), `user_confirmed` (manually marked), `unverified`. Native scores are never combined across games.
 - **Privacy:** screenshots private per user folder; invite tokens stored only as SHA-256 hashes; account deletion removes data and stored files.
 - **Not done:** third-party game account integrations (no official APIs confirmed), PWA/Web Share Target, advanced achievements.
+
+> Shortcut: `supabase/setup.sql` is all four migrations plus the seed in one file. Paste it into the Supabase SQL editor and run once on a fresh project.
