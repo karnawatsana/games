@@ -90,7 +90,7 @@ a { color: inherit; text-decoration: none; }
 
 .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 4px 6px; margin: 0 -16px; padding-inline: 20px; }
 .chips::-webkit-scrollbar { display: none; }
-.chip { height: 38px; padding: 0 16px; border-radius: 999px; background: var(--charcoal-2); color: rgb(245 241 232 / .7); font-size: 13px; font-weight: 600; flex: none; }
+.chip { display: inline-flex; align-items: center; justify-content: center; height: 38px; padding: 0 16px; border-radius: 999px; background: var(--charcoal-2); color: rgb(245 241 232 / .7); font-size: 13px; font-weight: 600; flex: none; }
 .chip.active { background: var(--yellow); color: var(--charcoal); }
 
 /* ---------- cards ---------- */
@@ -237,3 +237,14 @@ a { color: inherit; text-decoration: none; }
 .gc-foot .actions .btn { flex: 1; }
 .gc-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .gc-status-row .meta { margin-top: 0; }
+
+/* forms */
+.field { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.field span { opacity: .7; }
+.field input, .field textarea, .field select {
+  height: 48px; border-radius: 16px; border: 1.5px solid rgb(32 33 32 / .15); background: #fff; padding: 0 14px;
+  font: inherit; font-weight: 500; font-size: 16px; color: var(--charcoal);
+}
+.field textarea { height: auto; min-height: 120px; padding: 12px 14px; }
+.field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid var(--charcoal); outline-offset: 1px; }
+.dark .field input, .dark .field textarea, .dark .field select { background: var(--charcoal-3); border-color: transparent; color: var(--cream); }

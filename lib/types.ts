@@ -24,6 +24,6 @@ export type DailyState = {
   user: { name: string; avatarUrl?: string; streak: number } | null;
   krillion: GameResultSummary;
   fermi: GameResultSummary;
-  mystery: { game: MysteryGame | null; revealed: boolean; result: GameResultSummary };
+  mystery: { available: boolean; game: MysteryGame | null; revealed: boolean; result: GameResultSummary };
   groups: { id: string; name: string; members: Friend[] }[];
 };

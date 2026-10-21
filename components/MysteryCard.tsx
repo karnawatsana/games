@@ -4,17 +4,17 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Arrow, Check, Play, Sparkle } from "./Icons";
 import type { DailyState } from "@/lib/types";
 
-type Props = { mystery: DailyState["mystery"]; signedIn: boolean; onReveal?: () => Promise<void> };
+type Props = { mystery: DailyState["mystery"]; signedIn: boolean; onReveal?: () => Promise<DailyState["mystery"]["game"]> };
 
 export default function MysteryCard({ mystery, signedIn, onReveal }: Props) {
   const reduce = useReducedMotion();
   const [revealed, setRevealed] = useState(mystery.revealed || mystery.result.completed);
   const [pending, start] = useTransition();
-  const g = mystery.game;
+  const [g, setG] = useState(mystery.game);
 
   const reveal = () => {
-    setRevealed(true); // optimistic; the global selection is never changed by this
-    if (onReveal) start(() => { void onReveal(); });
+    // the global selection is never changed by this; only this user's reveal state is stored
+    start(async () => { const game = onReveal ? await onReveal() : g; if (game) { setG(game); setRevealed(true); } });
   };
 
   return (
@@ -27,10 +27,10 @@ export default function MysteryCard({ mystery, signedIn, onReveal }: Props) {
             <div>
               <span className="label">Game 03 · Mystery</span>
               <h2>Something <em>new</em> for your brain.</h2>
-              <p>{g ? "Same surprise for everyone today. Open it when you’re ready." : "Today’s surprise isn’t scheduled yet. Check back soon."}</p>
+              <p>{mystery.available ? "Same surprise for everyone today. Open it when you’re ready." : "Today’s surprise isn’t scheduled yet. Check back soon."}</p>
             </div>
             <div className="gc-foot">
-              <button className="btn" style={{ flex: 1, opacity: g ? 1 : .5 }} onClick={reveal} disabled={!g || pending}>
+              <button className="btn" style={{ flex: 1, opacity: mystery.available ? 1 : .5 }} onClick={reveal} disabled={!mystery.available || pending}>
                 <Sparkle size={18} /> Reveal today’s game
               </button>
             </div>

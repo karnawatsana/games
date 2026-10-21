@@ -14,7 +14,8 @@ export default async function Preview({ searchParams }: { searchParams: Promise<
     krillion: n >= 1 ? { completed: true, scoreLabel: "310", scoreSuffix: "/ 700", verification: "verified" } : { completed: false },
     fermi: n >= 2 ? { completed: true, scoreLabel: "2.4×", scoreSuffix: "error", verification: "verified" } : { completed: false },
     mystery: {
-      game: { id: "demo", name: "Sample Game", url: "https://example.com", description: "Placeholder description for design review.", category: "Geography", estimatedMinutes: 4 },
+      available: true,
+      game: n >= 3 ? { id: "demo", name: "Sample Game", url: "https://example.com", description: "Placeholder description for design review.", category: "Geography", estimatedMinutes: 4 } : null,
       revealed: n >= 3,
       result: n >= 3 ? { completed: true, verification: "user_confirmed" } : { completed: false },
     },

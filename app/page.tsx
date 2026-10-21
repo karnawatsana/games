@@ -1,8 +1,9 @@
 import HomeView from "@/components/Home";
-import { getDailyState } from "@/lib/daily";
+import { revealMystery } from "@/app/actions/mystery";
+import { getDailyState } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  return <HomeView state={await getDailyState()} />;
+  return <HomeView state={await getDailyState()} onReveal={revealMystery} />;
 }

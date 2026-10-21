@@ -6,7 +6,7 @@ import MysteryCard from "./MysteryCard";
 import FriendsPreview from "./FriendsPreview";
 import type { DailyState } from "@/lib/types";
 
-export default function HomeView({ state, onReveal }: { state: DailyState; onReveal?: () => Promise<void> }) {
+export default function HomeView({ state, onReveal }: { state: DailyState; onReveal?: () => Promise<DailyState["mystery"]["game"]> }) {
   const done = [state.krillion, state.fermi, state.mystery.result].filter((r) => r.completed).length;
   return (
     <>
