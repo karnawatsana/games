@@ -1,7 +1,8 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import Avatar from "@/components/Avatar";
-import { avatarUrl, getViewer } from "@/lib/data";
+import { avatarUrl } from "@/lib/data";
+import { requireViewer } from "@/lib/auth";
 import { productDate } from "@/lib/dates";
 import { activeStreak, longestStreak, personalBest, completedOn, type ResultRow } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
@@ -9,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export default async function Profile() {
-  const v = (await getViewer())!;
+  const v = await requireViewer("/profile");
   const sb = await createClient();
   const today = productDate();
   const [{ data: res }, { data: mem }] = await Promise.all([

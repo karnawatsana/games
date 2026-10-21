@@ -2,12 +2,14 @@ import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { createGroup } from "@/app/actions/groups";
 import { createClient } from "@/lib/supabase/server";
+import { requireViewer } from "@/lib/auth";
 import CreateGroupForm from "./CreateGroupForm";
 
 export const dynamic = "force-dynamic";
 const colors = ["coral", "butter", "mint", "sky", "lavender", "lime"];
 
 export default async function Groups() {
+  await requireViewer("/groups");
   const sb = await createClient();
   const { data } = await sb.from("group_members").select("group_id, groups(id, name)");
   const groups = (data ?? []).map((d) => d.groups as unknown as { id: string; name: string }).filter(Boolean);

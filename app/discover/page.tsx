@@ -1,6 +1,6 @@
 import AppShell from "@/components/AppShell";
 import ReactionButtons from "@/components/ReactionButtons";
-import { getViewer } from "@/lib/data";
+import { requireViewer } from "@/lib/auth";
 import { prettyDate, productDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const colors = ["lavender", "mint", "butter", "sky", "coral", "lime"];
 
 export default async function Discover() {
-  const viewer = (await getViewer())!;
+  const viewer = await requireViewer("/discover");
   const today = productDate();
   const sb = await createClient();
   const [{ data: played }, { data: schedule }, { data: totals }, { data: mine }] = await Promise.all([

@@ -2,7 +2,8 @@ import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import CompareView from "@/components/results/CompareView";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { avatarUrl, getViewer } from "@/lib/data";
+import { avatarUrl } from "@/lib/data";
+import { requireViewer } from "@/lib/auth";
 import { prettyDate, productDate } from "@/lib/dates";
 import type { AnswerRow } from "@/lib/compare";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Compare({ searchParams }: { searchParams: Promise<{ group?: string; date?: string; view?: string; reveal?: string }> }) {
   const sp = await searchParams;
-  const viewer = (await getViewer())!;
+  const viewer = await requireViewer("/results/compare");
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : productDate();
   const sb = await createClient();
 

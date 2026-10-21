@@ -1,7 +1,8 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import SubmitFlow from "@/components/results/SubmitFlow";
-import { getMysteryGameRow, getViewer } from "@/lib/data";
+import { getMysteryGameRow } from "@/lib/data";
+import { requireViewer } from "@/lib/auth";
 import { productDate, prettyDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Results({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
   const { game } = await searchParams;
-  const viewer = (await getViewer())!;
+  const viewer = await requireViewer("/results");
   const today = productDate();
   const sb = await createClient();
   const [mystery, { data: history }] = await Promise.all([

@@ -4,7 +4,7 @@ import AppShell from "@/components/AppShell";
 import Avatar from "@/components/Avatar";
 import InviteButton from "@/components/InviteButton";
 import { loadGroup } from "@/lib/groupData";
-import { getViewer } from "@/lib/data";
+import { requireViewer } from "@/lib/auth";
 import { productDate } from "@/lib/dates";
 import { dailyBoard, rankGameScores, weeklyBoard } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
@@ -21,7 +21,7 @@ const EVENT: Record<string, (n: string, g?: string) => string> = {
 
 export default async function GroupPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params; const { tab = "daily" } = await searchParams;
-  const viewer = (await getViewer())!;
+  const viewer = await requireViewer(`/groups/${id}`);
   const today = productDate();
   const data = await loadGroup(id, today);
   if (!data) notFound();
