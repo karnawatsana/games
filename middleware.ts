@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/", "/login", "/auth", "/preview"];
+const PUBLIC = ["/", "/login", "/auth", "/preview", "/api/health", "/manifest.webmanifest"];
 
 const isPublic = (path: string) => PUBLIC.some((p) => path === p || (p !== "/" && path.startsWith(p + "/")));
 
@@ -19,6 +19,15 @@ export async function middleware(req: NextRequest) {
   if (!cfg) {
     // Not configured (or misconfigured): only the public shell renders; everything else needs the database.
     return isPublic(path) ? NextResponse.next() : NextResponse.redirect(new URL("/", req.url));
+  }
+  // Supabase stores the session in sb-*-auth-token cookies. With none, the visitor is signed out: no network call needed.
+  const hasSession = req.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
+  if (!hasSession) {
+    if (isPublic(path)) return NextResponse.next();
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", path + req.nextUrl.search);
+    return NextResponse.redirect(url);
   }
   try {
     let res = NextResponse.next({ request: req });
@@ -47,4 +56,7 @@ export async function middleware(req: NextRequest) {
   }
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"] };
+export const config = {
+  runtime: "nodejs", // Supabase's client targets Node; avoids Edge-runtime incompatibilities
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
+};
